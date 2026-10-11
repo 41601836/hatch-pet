@@ -1,0 +1,22 @@
+#!/bin/bash
+LOG="/tmp/jiuer_pet.log"
+echo "=== start $(date) ===" > "$LOG"
+
+# 用 miniconda python3（有 tkinter + 可用）
+PYTHON="/Users/lyu/miniconda3/bin/python3"
+echo "PYTHON=$PYTHON" >> "$LOG"
+"$PYTHON" --version >> "$LOG" 2>&1
+
+# 检查 tkinter
+"$PYTHON" -c "import tkinter; print('tkinter OK')" >> "$LOG" 2>&1
+echo "tkinter check exit=$?" >> "$LOG"
+
+# 检查 GIF 目录
+APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+GIF_DIR="$APP_DIR/Resources/gifs"
+echo "GIF_DIR=$GIF_DIR (exists=$(test -d "$GIF_DIR" && echo yes || echo no))" >> "$LOG"
+ls "$GIF_DIR" >> "$LOG" 2>&1
+
+# 运行
+echo "launching..." >> "$LOG"
+exec "$PYTHON" "$APP_DIR/Resources/jiuer_desktop.py" >> "$LOG" 2>&1

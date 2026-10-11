@@ -1,0 +1,8 @@
+# 生成中间产物
+output/
+runs/
+
+# 系统与缓存
+.DS_Store
+__pycache__/
+*.pyc

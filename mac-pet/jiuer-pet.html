@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>九儿桌面宠物</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:hidden; background:transparent; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif; }
+#pet {
+  position:absolute; width:192px; height:208px; cursor:grab; user-select:none;
+  -webkit-user-drag:none; background-size:cover; background-repeat:no-repeat;
+  image-rendering:crisp-edges; transition:transform 0.15s ease;
+}
+#pet:active { cursor:grabbing; }
+#info {
+  position:fixed; bottom:12px; left:12px; color:#666; font-size:11px;
+  background:rgba(255,255,255,0.85); padding:6px 10px; border-radius:6px;
+  backdrop-filter:blur(4px); pointer-events:none; user-select:none;
+}
+#state {
+  position:fixed; bottom:12px; right:12px; color:#333; font-size:12px;
+  background:rgba(255,255,255,0.9); padding:6px 10px; border-radius:6px;
+  backdrop-filter:blur(4px); pointer-events:none; user-select:none;
+}
+button {
+  position:fixed; top:12px; left:12px; padding:6px 12px; font-size:12px;
+  background:rgba(255,255,255,0.9); border:1px solid #ccc; border-radius:6px;
+  cursor:pointer; backdrop-filter:blur(4px);
+}
+button:hover { background:#f0f0f0; }
+</style>
+</head>
+<body>
+<div id="pet"></div>
+<div id="info">九儿 v2.1 · 拖拽移动 · 点击比心</div>
+<div id="state">idle</div>
+<button id="btn">切换状态</button>
+
+<script>
+// ============ 配置 ============
+const SPRITE_URL = 'spritesheet.webp'; // 或绝对路径
+const SPRITE_COLS = 8;
+const SPRITE_ROWS = 9;
+const CELL_W = 192;
+const CELL_H = 208;
+const FPS = 12; // 播放帧率
+
+// 各状态行索引与帧数（从 spritesheet 行序提取）
+const STATES = {
+  idle:        { row: 0, frames: 6 },
+  runningRight:{ row: 1, frames: 8 },
+  runningLeft: { row: 2, frames: 8 },
+  waving:      { row: 3, frames: 4 },
+  heartCute:   { row: 4, frames: 5 },  // 点击比心
+  failed:      { row: 5, frames: 8 },
+  waiting:     { row: 6, frames: 6 },
+  running:     { row: 7, frames: 6 },
+  review:      { row: 8, frames: 6 },
+};
+
+// ============ 全局状态 ============
+const pet = document.getElementById('pet');
+const stateLabel = document.getElementById('state');
+let currentState = 'idle';
+let currentFrame = 0;
+let direction = 'right'; // 或 left，影响 running 行选择
+let isDragging = false;
+let offsetX = 0, offsetY = 0;
+let animationTimer = null;
+let interactionLock = false; // 防止连续点击比心打断
+let posX = 100, posY = 100;
+
+// ============ 初始化 ============
+pet.style.backgroundImage = `url("${SPRITE_URL}")`;
+pet.style.left = posX + 'px';
+pet.style.top = posY + 'px';
+
+// ============ 动画循环 ============
+function nextFrame() {
+  const state = STATES[currentState];
+  if (!state) return;
+
+  currentFrame = (currentFrame + 1) % state.frames;
+  const x = currentFrame * CELL_W;
+  const y = state.row * CELL_H;
+  pet.style.backgroundPosition = `-${x}px -${y}px`;
+
+  // 状态逻辑：当播放到循环末尾时自动切换
+  if (currentFrame === 0) {
+    handleAutoTransition();
+  }
+}
+
+function handleAutoTransition() {
+  // idle 播完后随机切换到 running
+  if (currentState === 'idle' && Math.random() < 0.25) {
+    setState('running');
+  }
+  // running 播完几圈后回 idle
+  else if (currentState === 'running' && Math.random() < 0.15) {
+    setState('idle');
+  }
+  // waiting 播完回 idle
+  else if (currentState === 'waiting' && Math.random() < 0.2) {
+    setState('idle');
+  }
+  // heartCute 播完回 idle
+  else if (currentState === 'heartCute') {
+    setState('idle');
+  }
+  // failed 播完回 waiting
+  else if (currentState === 'failed' && Math.random() < 0.3) {
+    setState('waiting');
+  }
+}
+
+function setState(newState) {
+  if (!STATES[newState] || interactionLock) return;
+  currentState = newState;
+  currentFrame = 0;
+  stateLabel.textContent = newState;
+  updateFrame();
+}
+
+function updateFrame() {
+  const state = STATES[currentState];
+  const x = currentFrame * CELL_W;
+  const y = state.row * CELL_H;
+  pet.style.backgroundPosition = `-${x}px -${y}px`;
+}
+
+// ============ 点击交互：比心 ============
+pet.addEventListener('click', (e) => {
+  if (isDragging || interactionLock) return;
+  interactionLock = true;
+  setState('heartCute');
+  // 播放完毕后解锁
+  const state = STATES.heartCute;
+  setTimeout(() => {
+    interactionLock = false;
+    if (currentState === 'heartCute') setState('idle');
+  }, (state.frames * 1000) / FPS);
+});
+
+// ============ 拖拽移动 ============
+pet.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  offsetX = e.clientX - posX;
+  offsetY = e.clientY - posY;
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  posX = e.clientX - offsetX;
+  posY = e.clientY - offsetY;
+  pet.style.left = posX + 'px';
+  pet.style.top = posY + 'px';
+
+  // 拖拽时触发奔跑动画（朝移动方向）
+  if (Math.abs(e.movementX) > 2) {
+    const dir = e.movementX > 0 ? 'right' : 'left';
+    if (direction !== dir) {
+      direction = dir;
+      if (currentState === 'idle' || currentState === 'waiting') {
+        setState('running' + (direction === 'right' ? 'Right' : 'Left'));
+      }
+    }
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (isDragging) {
+    isDragging = false;
+    // 松开鼠标后回 idle
+    if (currentState.startsWith('running')) setState('idle');
+  }
+});
+
+// ============ 按钮：手动切换状态演示 ============
+const stateOrder = ['idle', 'running', 'waiting', 'waving', 'failed', 'review', 'runningRight', 'runningLeft'];
+let stateIndex = 0;
+document.getElementById('btn').addEventListener('click', () => {
+  stateIndex = (stateIndex + 1) % stateOrder.length;
+  setState(stateOrder[stateIndex]);
+});
+
+// ============ 启动动画循环 ============
+setInterval(nextFrame, 1000 / FPS);
+updateFrame();
+
+console.log('九儿桌面宠物已启动');
+</script>
+</body>
+</html>
